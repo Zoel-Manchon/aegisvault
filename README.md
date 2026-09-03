@@ -139,10 +139,19 @@ The pure-Python crypto backend keeps CI green without a Rust toolchain; Rust-spe
 
 ## Roadmap
 
-- GitHub Actions CI (pytest + maturin wheel build)
-- Windows binary via Nuitka (GitHub Release artifact)
-- Browser-extension autofill through the agent
-- Passkey/WebAuthn unlock
+- [ ] **GitHub Actions CI** — pytest against the pure-Python crypto backend, plus a
+      maturin wheel build so the Rust `ferrocrypto` path is covered too.
+- [ ] **Windows binary via Nuitka**, published as a GitHub Release artifact.
+- [ ] **Browser-extension autofill through the agent.** The agent already serves
+      `LIST` / `GET` / `CODE` over its Unix socket; what is missing is the extension
+      itself and the native-messaging host that bridges it.
+- [ ] **Passkey/WebAuthn unlock.** The seam is wired, the ceremony is not, and the
+      code says so out loud: `DesktopPasskeyUnlockService` reports the platform
+      authenticator and the GUI dialog lists the enrolment steps, but
+      `webauthn_ready` is `False` on purpose. A real unlock still needs a
+      device-bound credential store, challenge signing, account binding and a
+      recovery path — and recovery shares stay mandatory before passkey-only
+      unlock is ever allowed.
 
 ## License
 
