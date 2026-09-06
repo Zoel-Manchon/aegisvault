@@ -14,6 +14,7 @@ from __future__ import annotations
 import base64
 import json
 import sqlite3
+from contextlib import closing
 
 from ....application.services.dto import EncryptedVault
 
@@ -39,14 +40,14 @@ class SqliteVaultRepository:
 
     def exists(self) -> bool:
         try:
-            with self._conn() as conn:
+            with closing(self._conn()) as conn, conn:
                 row = conn.execute("SELECT 1 FROM vault WHERE id = 1").fetchone()
             return row is not None
         except sqlite3.Error:
             return False
 
     def load(self) -> EncryptedVault:
-        with self._conn() as conn:
+        with closing(self._conn()) as conn, conn:
             row = conn.execute(
                 "SELECT header, nonce, ciphertext FROM vault WHERE id = 1").fetchone()
         if row is None:
@@ -56,7 +57,7 @@ class SqliteVaultRepository:
                               nonce=bytes(nonce), ciphertext=bytes(ciphertext))
 
     def save(self, artifact: EncryptedVault) -> None:
-        with self._conn() as conn:
+        with closing(self._conn()) as conn, conn:
             conn.execute(
                 "INSERT INTO vault (id, header, nonce, ciphertext, updated_at) "
                 "VALUES (1, ?, ?, ?, datetime('now')) "
