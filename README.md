@@ -2,6 +2,11 @@
 
 # 🛡️ AegisVault
 
+![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)
+![core Rust](https://img.shields.io/badge/core-Rust-CE422B?style=flat-square&logo=rust&logoColor=white)
+![crypto Argon2id + XChaCha20](https://img.shields.io/badge/crypto-Argon2id_+_XChaCha20-6E7681?style=flat-square)
+![recovery Shamir K-of-N](https://img.shields.io/badge/recovery-Shamir_K--of--N-1F2A37?style=flat-square)
+
 **An encrypted, local-first secrets vault — Python domain core, Rust crypto engine, desktop GUI + CLI.**
 
 *Domain-Driven Design · Hexagonal architecture · Zero-knowledge storage*
