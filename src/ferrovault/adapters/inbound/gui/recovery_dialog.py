@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (QDialog, QFormLayout, QHBoxLayout, QLabel,
                                QPushButton, QSpinBox, QVBoxLayout)
 
 from ....application.errors import AuthenticationError
-from .theme import ACCENT, DANGER, MUTED
+from .theme import PALETTE as P
 
 
 class EnrollDialog(QDialog):
@@ -56,7 +56,7 @@ class EnrollDialog(QDialog):
         self.output.setPlainText("\n".join(shares))
         self.warn.setText("⚠ Store each share separately. Anyone with "
                           f"{self.k.value()} shares can reset your password.")
-        self.warn.setStyleSheet(f"color: {DANGER};")
+        self.warn.setStyleSheet(f"color: {P.WARNING};")
 
 
 class RestoreDialog(QDialog):

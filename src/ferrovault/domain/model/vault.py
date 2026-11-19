@@ -13,6 +13,10 @@ from ..value_objects.entry_id import EntryId
 from ..value_objects.secret import Secret
 
 
+ENTRY_KINDS = ("login", "api_key", "note", "card")
+PASSWORD_HISTORY_LIMIT = 10
+
+
 class EntryNameTaken(Exception):
     pass
 
@@ -45,6 +49,10 @@ class Entry:
     expires_at: str = ""
     created_at: str = ""
     updated_at: str = ""
+    kind: str = "login"              # login | api_key | note | card
+    password_changed_at: str = ""
+    # Previous secrets, newest first: ({"secret": Secret, "changed_at": iso}, ...)
+    password_history: tuple = ()
 
     def matches(self, query: str) -> bool:
         q = query.lower()
@@ -76,6 +84,18 @@ class Vault:
         if eid is None:
             raise EntryNotFound(name)
         return self._entries[eid]
+
+    def rename(self, old: str, new: str) -> None:
+        """Rename an entry, keeping the case-insensitive uniqueness invariant."""
+        new = new.strip()
+        if not new:
+            raise ValueError("an entry needs a name")
+        entry = self.get(old)
+        if new.lower() != old.lower() and new.lower() in self._names:
+            raise EntryNameTaken(new)
+        del self._names[old.lower()]
+        entry.name = new
+        self._names[new.lower()] = entry.id.value
 
     def remove(self, name: str) -> None:
         eid = self._names.pop(name.lower(), None)

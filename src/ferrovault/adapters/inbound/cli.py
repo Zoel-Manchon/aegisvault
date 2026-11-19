@@ -9,8 +9,10 @@ import argparse
 import getpass
 import sys
 
-from ...application.errors import (AuthenticationError, VaultAlreadyExists,
+from ...application.errors import (AuthenticationError, UnsupportedVaultFormat,
+                                   VaultAlreadyExists, VaultConflictError,
                                    VaultDoesNotExist)
+from ...application.services.master_password import master_password_problems
 from ...domain.model.vault import EntryNameTaken, EntryNotFound
 from ...domain.value_objects.password_policy import PasswordPolicy
 from ...container import build_vault_service
@@ -19,6 +21,19 @@ from ...container import build_vault_service
 def _password(confirm: bool = False) -> str:
     pw = getpass.getpass("master password: ")
     if confirm and pw != getpass.getpass("confirm: "):
+        print("passwords do not match", file=sys.stderr)
+        sys.exit(2)
+    return pw
+
+
+def _new_master_password(prompt: str = "new master password: ") -> str:
+    """Prompt twice and enforce the master-password floor (12+ chars, not common)."""
+    pw = getpass.getpass(prompt)
+    problems = master_password_problems(pw)
+    if problems:
+        print("master password rejected: " + "; ".join(problems), file=sys.stderr)
+        sys.exit(2)
+    if pw != getpass.getpass("confirm: "):
         print("passwords do not match", file=sys.stderr)
         sys.exit(2)
     return pw
@@ -110,7 +125,7 @@ def main(argv: list | None = None) -> int:
 
     try:
         if args.command == "init":
-            service.init_vault(_password(confirm=True))
+            service.init_vault(_new_master_password("master password: "))
             print(f"created vault: {args.vault}")
         elif args.command == "gen":
             pw, label = service.generate_password(PasswordPolicy(length=args.length))
@@ -204,7 +219,10 @@ def main(argv: list | None = None) -> int:
             print(f"encrypted sync bundle written to {args.out}")
         elif args.command == "sync-import":
             with open(args.src, encoding="utf-8") as fh:
-                service.import_sync_bundle(fh.read())
+                payload = fh.read()
+            # The password proves the bundle belongs to this vault before the
+            # local file is replaced (a snapshot of it is kept).
+            service.import_sync_bundle(payload, password=_password())
             print(f"encrypted sync bundle imported into {args.vault}")
         elif args.command == "enterprise":
             from ...application.services.enterprise import EnterpriseIdentity
@@ -238,15 +256,12 @@ def main(argv: list | None = None) -> int:
                 if not line:
                     break
                 shares.append(line)
-            new_pw = _password(confirm=True)
+            new_pw = _new_master_password()
             service.recover(shares, new_pw)
             print("vault recovered; master password reset.")
         elif args.command == "rotate":
             old = getpass.getpass("current master password: ")
-            new = getpass.getpass("new master password: ")
-            if new != getpass.getpass("confirm new password: "):
-                print("passwords do not match", file=sys.stderr)
-                return 2
+            new = _new_master_password()
             service.rotate(old, new)
             print("master password changed.")
         elif args.command == "backup":
@@ -256,7 +271,13 @@ def main(argv: list | None = None) -> int:
             shutil.copy2(args.vault, args.out)
             print(f"encrypted backup written to {args.out}")
         elif args.command == "restore":
+            import os
             import shutil
+            from ...adapters.outbound.storage.file_repository import FileVaultRepository
+            FileVaultRepository(args.src).load()          # refuse anything that is not a vault file
+            if os.path.exists(args.vault):
+                kept = FileVaultRepository(args.vault).snapshot("pre-restore")
+                print(f"previous vault kept at {kept}")
             shutil.copy2(args.src, args.vault)
             print(f"vault restored from {args.src} -> {args.vault}")
         elif args.command == "agent":
@@ -280,9 +301,14 @@ def main(argv: list | None = None) -> int:
             from ...adapters.outbound.sharing.sealed_box import generate_keypair
             priv, pub = generate_keypair()
             path = "ferrovault_id.key"
-            with open(path, "w", encoding="utf-8") as fh:
+            try:
+                # "x": never overwrite an existing private key
+                fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            except FileExistsError:
+                print(f"{path} already exists; move it away first", file=sys.stderr)
+                return 1
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
                 fh.write(priv)
-            os.chmod(path, 0o600)
             print(f"private key written to {path} (keep it secret)")
             print(f"\nyour public key (share this):\n{pub}")
         elif args.command == "share":
@@ -306,14 +332,16 @@ def main(argv: list | None = None) -> int:
             from ...adapters.outbound.sharing.sealed_box import open_sealed
             with open(args.key, encoding="utf-8") as fh:
                 priv = fh.read()
+            from ...application.services.sharing import parse_share_payload
             blob = sys.stdin.read().strip()
-            secret = open_sealed(blob, priv)
+            opened = parse_share_payload(open_sealed(blob, priv))
             if args.add:
-                service.add_entry(_password(), args.add, "", secret)
+                service.add_entry(_password(), args.add, opened["username"], opened["secret"], url=opened["url"])
                 print(f"stored shared secret as '{args.add}'")
             else:
-                print(secret)
+                print(opened["secret"])
     except (VaultAlreadyExists, VaultDoesNotExist, AuthenticationError,
+            UnsupportedVaultFormat, VaultConflictError,
             EntryNameTaken, EntryNotFound, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

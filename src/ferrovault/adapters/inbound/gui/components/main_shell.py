@@ -33,14 +33,14 @@ class MainShellView(QWidget):
         self.setObjectName("appShell")
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(18, 18, 18, 18)
-        outer.setSpacing(14)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
 
         self.top_bar = AppTopBar(primary_actions=primary_actions, more_actions=more_actions)
         outer.addWidget(self.top_bar)
 
         main = QHBoxLayout()
-        main.setSpacing(14)
+        main.setSpacing(0)
         self.sidebar = AppSidebar(
             sections=sections,
             current=current_section,

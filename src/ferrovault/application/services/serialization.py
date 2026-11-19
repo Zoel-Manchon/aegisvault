@@ -47,6 +47,13 @@ def _entry_to_dict(e: Entry) -> dict:
         "expires_at": getattr(e, "expires_at", ""),
         "created_at": e.created_at,
         "updated_at": e.updated_at,
+        "kind": getattr(e, "kind", "login") or "login",
+        "password_changed_at": getattr(e, "password_changed_at", ""),
+        "password_history": [
+            {"secret": base64.b64encode(h["secret"].reveal_bytes()).decode(),
+             "changed_at": h.get("changed_at", "")}
+            for h in getattr(e, "password_history", ()) or ()
+        ],
     }
 
 
@@ -75,6 +82,12 @@ def _entry_from_dict(d: dict) -> Entry:
         expires_at=d.get("expires_at", ""),
         created_at=d.get("created_at", ""),
         updated_at=d.get("updated_at", ""),
+        kind=d.get("kind", "login") or "login",
+        password_changed_at=d.get("password_changed_at", "") or d.get("created_at", ""),
+        password_history=tuple(
+            {"secret": Secret(base64.b64decode(h["secret"])), "changed_at": h.get("changed_at", "")}
+            for h in d.get("password_history", []) if isinstance(h, dict) and "secret" in h
+        ),
     )
 
 
@@ -91,7 +104,9 @@ def _block_from_dict(d: dict) -> AuditBlock:
 def serialize(vault: Vault, ledger: AuditLedger) -> bytes:
     payload = {
         "version": VAULT_VERSION,
-        "entries": [_entry_to_dict(e) for e in vault.list()],
+        # include_deleted: an entry in the trash must survive a save until it
+        # is purged, otherwise "move to trash" silently deletes it for good.
+        "entries": [_entry_to_dict(e) for e in vault.list(include_deleted=True)],
         "audit": [_block_to_dict(b) for b in ledger.blocks],
     }
     return json.dumps(payload).encode("utf-8")

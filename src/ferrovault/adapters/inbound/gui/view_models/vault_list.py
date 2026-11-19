@@ -279,6 +279,10 @@ class VaultListViewModel:
 
         if state.sort == "name":
             views.sort(key=lambda v: str(getattr(v, "name", "")).lower())
+        else:
+            # "recent": last edited first (ISO-8601 timestamps sort as text).
+            # The sort is stable, so entries without timestamps keep vault order.
+            views.sort(key=_recency, reverse=True)
 
         query = state.query.lower().strip()
         if query:
@@ -292,6 +296,10 @@ class VaultListViewModel:
             return "No entries yet"
         start = page * self.page_size + 1
         return f"{start}–{start + page_count - 1} of {matched_count}"
+
+
+def _recency(view: Any) -> str:
+    return str(getattr(view, "updated_at", "") or getattr(view, "created_at", "") or "")
 
 
 def _deleted(view: Any) -> bool:

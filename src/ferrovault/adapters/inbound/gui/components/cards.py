@@ -6,7 +6,8 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLay
 
 from ..favicons import favicon_icon, favicon_pixmap
 from ..icons import icon
-from ..theme import ACCENT, GOOD, MUTED, TEXT
+from ..design.tokens import ENTRY_ROW_H
+from ..theme import PALETTE as P
 from .primitives import MetricCard
 
 
@@ -36,15 +37,15 @@ class EntryCard(QFrame):
         super().__init__()
         self.setObjectName("entryCard")
         self.setProperty("selected", "true" if selected else "false")
-        self.setMinimumHeight(74)
+        self.setMinimumHeight(ENTRY_ROW_H)
         row = QHBoxLayout(self)
-        row.setContentsMargins(14, 10, 14, 10)
+        row.setContentsMargins(12, 8, 12, 8)
         row.setSpacing(12)
 
         avatar = QLabel()
-        avatar.setFixedSize(42, 42)
+        avatar.setFixedSize(36, 36)
         avatar.setAlignment(Qt.AlignCenter)
-        avatar.setPixmap(favicon_pixmap(getattr(view, "url", ""), initials(view.name), 42))
+        avatar.setPixmap(favicon_pixmap(getattr(view, "url", ""), initials(view.name), 36))
         avatar.setStyleSheet("background: transparent; border: none;")
         row.addWidget(avatar)
 
@@ -60,10 +61,10 @@ class EntryCard(QFrame):
         row.addLayout(texts, 1)
 
         star = QLabel("★" if getattr(view, "favorite", False) else "☆")
-        star.setStyleSheet(f"color: {ACCENT}; font-size: 22px; background: transparent;")
+        star.setStyleSheet(f"color: {P.ACCENT}; font-size: 16px; background: transparent;")
         row.addWidget(star)
         dots = QLabel("•••")
-        dots.setStyleSheet(f"color: {MUTED}; font-size: 18px; letter-spacing: 2px; background: transparent;")
+        dots.setStyleSheet(f"color: {P.TEXT_TERTIARY}; font-size: 14px; letter-spacing: 2px; background: transparent;")
         row.addWidget(dots)
 
 
@@ -79,7 +80,7 @@ class CategoryCard(QPushButton):
         self.setObjectName("categoryCard")
         self.setCursor(Qt.PointingHandCursor)
         self.setMinimumHeight(108)
-        self.setIcon(favicon_icon(top_url, name, 34) if top_url else icon("grid", ACCENT, 28))
+        self.setIcon(favicon_icon(top_url, name, 34) if top_url else icon("grid", P.TEXT_SECONDARY, 28))
         self.setIconSize(QSize(34, 34))
 
 
@@ -93,7 +94,7 @@ class HealthCard(QFrame):
         row.setContentsMargins(14, 12, 14, 12)
         row.setSpacing(10)
         shield = QLabel()
-        shield.setPixmap(icon("shield", GOOD, 26).pixmap(26, 26))
+        shield.setPixmap(icon("shield", P.SUCCESS, 26).pixmap(26, 26))
         row.addWidget(shield)
         txt = QVBoxLayout()
         ok = QLabel(title)

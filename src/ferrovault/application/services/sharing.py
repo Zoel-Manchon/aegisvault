@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from typing import Iterable, Mapping, Any
 
 from ...adapters.outbound.sharing.sealed_box import seal
@@ -36,10 +38,27 @@ class ShareGrant:
     revoke_reason: str = ""
     algorithm: str = "X25519-HKDF-SHA256-AESGCM"
     version: int = 1
+    expires_at: str = ""      # registry expiry; "" = no expiry
+    includes: str = "secret"  # "secret" (bare secret) or "login" (share_payload JSON)
 
     @property
     def active(self) -> bool:
         return not self.revoked_at
+
+    def expired(self, now_iso: str) -> bool:
+        """True once ``expires_at`` has passed. Like revocation, expiry only
+        stops future delivery: an envelope already handed over stays readable.
+
+        An expiry that cannot be read fails closed (the grant counts as
+        expired), so a damaged date never keeps a grant alive. Times without
+        a zone are taken as UTC, which is what the vault clock writes.
+        """
+        if not self.expires_at:
+            return False
+        try:
+            return _as_utc(self.expires_at) <= _as_utc(now_iso)
+        except (TypeError, ValueError):
+            return True
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -59,8 +78,15 @@ class ShareGrant:
         payload.setdefault("revoke_reason", "")
         payload.setdefault("algorithm", "X25519-HKDF-SHA256-AESGCM")
         payload.setdefault("version", 1)
+        payload.setdefault("expires_at", "")
+        payload.setdefault("includes", "secret")
         allowed = {f.name for f in cls.__dataclass_fields__.values()}
         return cls(**{k: payload[k] for k in allowed})
+
+
+def _as_utc(text: str) -> datetime:
+    moment = datetime.fromisoformat(str(text).strip())
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=timezone.utc)
 
 
 def public_key_fingerprint(public_key_b64: str) -> str:
@@ -76,6 +102,31 @@ def _grant_id(entry_name: str, recipient: str, fingerprint: str, created_at: str
     return hashlib.sha256(material).hexdigest()[:20]
 
 
+SHARE_PAYLOAD_TYPE = "aegisvault-share"
+
+
+def share_payload(secret: str, *, username: str = "", url: str = "", name: str = "") -> str:
+    """Envelope body when the share includes the login, not just the secret."""
+    return json.dumps({"type": SHARE_PAYLOAD_TYPE, "v": 1, "name": name, "username": username, "url": url,
+                       "secret": secret}, ensure_ascii=False, separators=(",", ":"))
+
+
+def parse_share_payload(text: str) -> dict:
+    """Opened envelope -> {"secret", "username", "url", "name"}.
+
+    Envelopes made before logins could be included hold the bare secret, and
+    so does any text that is not our JSON payload.
+    """
+    try:
+        data = json.loads(text)
+    except (TypeError, ValueError):
+        data = None
+    if isinstance(data, dict) and data.get("type") == SHARE_PAYLOAD_TYPE and isinstance(data.get("secret"), str):
+        return {"secret": data["secret"], "username": str(data.get("username") or ""),
+                "url": str(data.get("url") or ""), "name": str(data.get("name") or "")}
+    return {"secret": text, "username": "", "url": "", "name": ""}
+
+
 def create_share_grant(
     *,
     entry_name: str,
@@ -84,14 +135,24 @@ def create_share_grant(
     recipient: str,
     created_at: str,
     created_by: str = "local-admin",
+    expires_at: str = "",
+    username: str = "",
+    url: str = "",
+    include_login: bool = False,
 ) -> ShareGrant:
-    """Create and encrypt a new recipient-specific grant."""
+    """Create and encrypt a new recipient-specific grant.
+
+    With ``include_login`` the envelope carries the user name and URL next to
+    the secret (``share_payload``); otherwise only the secret, as before.
+    """
     recipient = (recipient or "recipient").strip()
     if not recipient:
         recipient = "recipient"
     public_key = recipient_public_key.strip()
     fingerprint = public_key_fingerprint(public_key)
-    blob = seal(plaintext_secret, public_key)
+    body = (share_payload(plaintext_secret, username=username, url=url, name=entry_name)
+            if include_login else plaintext_secret)
+    blob = seal(body, public_key)
     gid = _grant_id(entry_name, recipient, fingerprint, created_at, blob)
     return ShareGrant(
         grant_id=gid,
@@ -101,6 +162,8 @@ def create_share_grant(
         sealed_blob=blob,
         created_at=created_at,
         created_by=created_by or "local-admin",
+        expires_at=expires_at or "",
+        includes="login" if include_login else "secret",
     )
 
 

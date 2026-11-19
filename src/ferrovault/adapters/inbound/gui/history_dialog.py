@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (QDialog, QFileDialog, QHBoxLayout, QLabel,
                                QPushButton, QScrollArea, QVBoxLayout, QWidget)
 
 from .svg import chain_flow_widget
-from .theme import ACCENT, DANGER, MUTED
+from .theme import PALETTE as P
 
 
 class HistoryDialog(QDialog):
@@ -21,7 +21,7 @@ class HistoryDialog(QDialog):
 
         head_row = QHBoxLayout()
         dot = QLabel("●")
-        dot.setStyleSheet(f"color: {ACCENT if verdict.ok else DANGER};")
+        dot.setStyleSheet(f"color: {P.SUCCESS if verdict.ok else P.DANGER};")
         status = QLabel("chain intact" if verdict.ok else "CHAIN TAMPERED")
         status.setObjectName("h1")
         head_row.addWidget(dot)

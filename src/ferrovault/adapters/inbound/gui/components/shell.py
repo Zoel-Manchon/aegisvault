@@ -8,8 +8,8 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMenu, QPushButton, Q
 from ..branding import PRODUCT_TAGLINE, PRODUCT_WORDMARK_A, PRODUCT_WORDMARK_B
 from ..icons import icon
 from ..svg import logo_widget
-from ..design.tokens import SIDEBAR_WIDTH, TOPBAR_HEIGHT
-from ..theme import ACCENT, ACCENT_2, MUTED, TEXT
+from ..design.tokens import CONTROL_H_MD, SIDEBAR_W, TOPBAR_H
+from ..theme import PALETTE as P
 from .cards import HealthCard
 
 
@@ -19,13 +19,13 @@ class AppTopBar(QFrame):
     def __init__(self, *, primary_actions: Iterable[tuple[str, str, str, Callable]], more_actions: Iterable[tuple[str, Callable]]):
         super().__init__()
         self.setObjectName("topbar")
-        self.setMinimumHeight(TOPBAR_HEIGHT)
-        self.setMaximumHeight(TOPBAR_HEIGHT + 8)
+        self.setFixedHeight(TOPBAR_H)
         row = QHBoxLayout(self)
-        row.setContentsMargins(18, 9, 18, 9)
-        row.setSpacing(12)
+        row.setContentsMargins(16, 0, 12, 0)
+        row.setSpacing(4)
 
-        row.addWidget(logo_widget(36))
+        row.addWidget(logo_widget(28))
+        row.addSpacing(6)
         brand_col = QVBoxLayout()
         brand_col.setSpacing(1)
         brand_line = QHBoxLayout()
@@ -46,19 +46,20 @@ class AppTopBar(QFrame):
         row.addLayout(brand_col)
         row.addStretch(1)
 
-        color_map = {"accent": ACCENT, "signal": ACCENT_2, "muted": MUTED, "text": TEXT}
+        # Top-bar actions are neutral; colour is reserved for state.
+        color_map = {"accent": P.TEXT_PRIMARY, "signal": P.TEXT_PRIMARY, "muted": P.TEXT_PRIMARY, "text": P.TEXT_PRIMARY}
         for text, icon_name, tone, handler in primary_actions:
             btn = QPushButton(f"  {text}")
-            btn.setIcon(icon(icon_name, color_map.get(tone, MUTED), 18))
+            btn.setIcon(icon(icon_name, color_map.get(tone, P.TEXT_PRIMARY), 16))
             btn.setObjectName("topNav")
-            btn.setMinimumHeight(38)
+            btn.setMinimumHeight(CONTROL_H_MD)
             btn.clicked.connect(handler)
             row.addWidget(btn)
 
         more = QPushButton("  More")
-        more.setIcon(icon("sliders", MUTED, 18))
+        more.setIcon(icon("sliders", P.TEXT_PRIMARY, 16))
         more.setObjectName("topNav")
-        more.setMinimumHeight(38)
+        more.setMinimumHeight(CONTROL_H_MD)
         menu = QMenu(more)
         for text, handler in more_actions:
             action = menu.addAction(text)
@@ -73,33 +74,31 @@ class AppSidebar(QFrame):
     def __init__(self, *, sections: Iterable[tuple[str, str]], current: str, on_select: Callable[[str], None], on_settings: Callable[[], None], show_health: bool):
         super().__init__()
         self.setObjectName("sidebar")
-        self.setFixedWidth(SIDEBAR_WIDTH)
+        self.setFixedWidth(SIDEBAR_W)
         self.nav_buttons: list[tuple[str, QPushButton]] = []
         self.health_card = HealthCard()
         col = QVBoxLayout(self)
-        col.setContentsMargins(12, 14, 12, 14)
-        col.setSpacing(7)
+        col.setContentsMargins(8, 12, 8, 12)
+        col.setSpacing(2)
         for name, icon_name in sections:
             button = QPushButton(f"  {name}")
-            button.setIcon(icon(icon_name, TEXT if name == current else MUTED, 20))
+            button.setIcon(icon(icon_name, P.TEXT_PRIMARY if name == current else P.TEXT_SECONDARY, 18))
             button.setObjectName("sideActive" if name == current else "sideNav")
-            button.setMinimumHeight(46)
-            button.setStyleSheet("text-align: left;")
+            button.setMinimumHeight(CONTROL_H_MD)
             button.clicked.connect(lambda _=False, section=name: on_select(section))
             self.nav_buttons.append((name, button))
             col.addWidget(button)
 
-        col.addSpacing(14)
+        col.addSpacing(8)
         line = QFrame()
         line.setFrameShape(QFrame.HLine)
         line.setObjectName("lineSeparator")
         col.addWidget(line)
 
         settings = QPushButton("  Settings")
-        settings.setIcon(icon("settings", MUTED, 20))
+        settings.setIcon(icon("settings", P.TEXT_SECONDARY, 18))
         settings.setObjectName("sideNav")
-        settings.setMinimumHeight(46)
-        settings.setStyleSheet("text-align: left;")
+        settings.setMinimumHeight(CONTROL_H_MD)
         settings.clicked.connect(on_settings)
         col.addWidget(settings)
         col.addStretch()
@@ -109,7 +108,7 @@ class AppSidebar(QFrame):
     def set_active(self, section: str) -> None:
         for name, button in self.nav_buttons:
             button.setObjectName("sideActive" if name == section else "sideNav")
-            button.setIcon(icon("shield" if name == "Zero Trust" else _icon_for(name), TEXT if name == section else MUTED, 20))
+            button.setIcon(icon("shield" if name == "Zero Trust" else _icon_for(name), P.TEXT_PRIMARY if name == section else P.TEXT_SECONDARY, 18))
             button.style().unpolish(button)
             button.style().polish(button)
 

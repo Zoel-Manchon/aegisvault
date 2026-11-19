@@ -6,7 +6,7 @@ from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from ..icons import icon
-from ..theme import ACCENT, ACCENT_2, MUTED, TEXT
+from ..theme import PALETTE as P
 
 
 def clear_layout(layout) -> None:
@@ -144,6 +144,6 @@ class ActionCard(QPushButton):
         self.setProperty("tone", tone)
         self.setCursor(Qt.PointingHandCursor)
         self.setMinimumHeight(104)
-        self.setIcon(icon(icon_name, ACCENT_2 if tone != "primary" else ACCENT, 28))
+        self.setIcon(icon(icon_name, P.ACCENT if tone == "primary" else P.TEXT_SECONDARY, 24))
         self.setIconSize(QSize(28, 28))
         self.clicked.connect(handler)

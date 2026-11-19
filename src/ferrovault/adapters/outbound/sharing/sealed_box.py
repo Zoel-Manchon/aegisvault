@@ -44,6 +44,14 @@ def generate_keypair() -> tuple:
     return _b64(priv_raw), _b64(_raw_pub(priv.public_key()))
 
 
+def public_key_of(private_key_b64: str) -> str:
+    """Public half of a base64 X25519 private key."""
+    raw = _b64d(private_key_b64.strip())
+    if len(raw) != 32:
+        raise ValueError("private key must be a base64-encoded 32-byte X25519 key")
+    return _b64(_raw_pub(X25519PrivateKey.from_private_bytes(raw).public_key()))
+
+
 def _derive(shared: bytes, eph_pub: bytes, recipient_pub: bytes) -> bytes:
     return HKDF(algorithm=hashes.SHA256(), length=32, salt=None,
                 info=_INFO + eph_pub + recipient_pub).derive(shared)

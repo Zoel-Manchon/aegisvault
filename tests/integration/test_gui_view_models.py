@@ -169,3 +169,23 @@ def test_dashboard_grid_rows_are_stable_and_column_bound():
     rows = grid_rows(("a", "b", "c"), columns=2)
 
     assert rows == ((0, 0, "a"), (0, 1, "b"), (1, 0, "c"))
+
+
+def test_recent_sort_puts_the_last_edited_entry_first():
+    @dataclass
+    class _Timed:
+        name: str
+        updated_at: str = ""
+        created_at: str = ""
+        deleted: bool = False
+        category: str = ""
+
+    entries = [
+        _Timed("old", updated_at="2025-01-01T00:00:00+00:00"),
+        _Timed("new", updated_at="2026-11-01T10:00:00+00:00"),
+        _Timed("mid", created_at="2026-03-01T00:00:00+00:00"),
+    ]
+    vm = VaultListViewModel(page_size=10)
+    assert [e.name for e in vm.page(entries).entries] == ["new", "mid", "old"]
+    vm.toggle_sort()
+    assert [e.name for e in vm.page(entries).entries] == ["mid", "new", "old"]

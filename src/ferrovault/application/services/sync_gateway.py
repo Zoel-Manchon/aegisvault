@@ -8,6 +8,7 @@ never receives or reveals plaintext secrets.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Iterable, Mapping, Any
 
 from .directory import DirectoryPrincipal, IdentityDirectory
@@ -32,9 +33,11 @@ class ZeroTrustSyncGateway:
         self._directory = directory
         self._require_trusted_device = bool(require_trusted_device)
 
-    def evaluate(self, entries: Iterable[Any], *, device_id: str = "") -> tuple[SyncDeliveryDecision, ...]:
+    def evaluate(self, entries: Iterable[Any], *, device_id: str = "",
+                 now: str | None = None) -> tuple[SyncDeliveryDecision, ...]:
         decisions: list[SyncDeliveryDecision] = []
         principals = self._principals_by_fingerprint()
+        self._now = now or datetime.now(timezone.utc).isoformat()
         for entry in entries:
             entry_name = getattr(entry, "name", "")
             for raw_grant in getattr(entry, "sharing_grants", ()) or ():
@@ -63,6 +66,8 @@ class ZeroTrustSyncGateway:
     def _allowed(self, grant: ShareGrant, principal: DirectoryPrincipal | None, device_id: str) -> tuple[bool, str]:
         if not grant.active:
             return False, "grant revoked"
+        if grant.expired(getattr(self, "_now", "") or datetime.now(timezone.utc).isoformat()):
+            return False, "grant expired"
         if principal is None:
             return False, "recipient is not in the user/device directory"
         if not principal.active:

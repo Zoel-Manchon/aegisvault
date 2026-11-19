@@ -20,7 +20,8 @@ from PySide6.QtWidgets import (
 
 from ..icons import icon
 from ..svg import empty_state_widget
-from ..theme import ACCENT, DANGER, MUTED, TEXT
+from ..design.tokens import CONTROL_H_MD, LIST_W_MAX, LIST_W_MIN
+from ..theme import PALETTE as P
 from .cards import EntryCard
 from .primitives import caption
 
@@ -46,24 +47,24 @@ class VaultListPanel(QFrame):
     ):
         super().__init__()
         self.setObjectName("listWrap")
-        self.setMinimumWidth(390)
-        self.setMaximumWidth(520)
+        self.setMinimumWidth(LIST_W_MIN)
+        self.setMaximumWidth(LIST_W_MAX)
 
         col = QVBoxLayout(self)
-        col.setContentsMargins(16, 16, 16, 16)
-        col.setSpacing(14)
+        col.setContentsMargins(16, 16, 16, 12)
+        col.setSpacing(12)
 
         top = QHBoxLayout()
         self.search = QLineEdit()
         self.search.setPlaceholderText("Search entries...")
-        self.search.addAction(icon("search", MUTED), QLineEdit.LeadingPosition)
+        self.search.addAction(icon("search", P.TEXT_TERTIARY, 16), QLineEdit.LeadingPosition)
         self.search.textChanged.connect(on_filter_changed)
         top.addWidget(self.search, 1)
 
         self.add_btn = QPushButton("  New")
-        self.add_btn.setIcon(icon("add", TEXT, 21))
+        self.add_btn.setIcon(icon("add", P.ON_ACCENT, 16))
         self.add_btn.setObjectName("primary")
-        self.add_btn.setMinimumHeight(52)
+        self.add_btn.setMinimumHeight(CONTROL_H_MD)
         self.add_btn.clicked.connect(on_add)
         top.addWidget(self.add_btn)
         col.addLayout(top)
@@ -76,9 +77,9 @@ class VaultListPanel(QFrame):
         self.sort_btn.setObjectName("filterBtn")
         self.sort_btn.clicked.connect(on_toggle_sort)
         clear_btn = QPushButton()
-        clear_btn.setIcon(icon("sliders", MUTED, 20))
+        clear_btn.setIcon(icon("sliders", P.TEXT_SECONDARY, 16))
         clear_btn.setObjectName("filterBtn")
-        clear_btn.setFixedWidth(52)
+        clear_btn.setFixedWidth(CONTROL_H_MD)
         clear_btn.clicked.connect(on_clear_filters)
         filters.addWidget(self.cat_btn)
         filters.addWidget(self.sort_btn)
@@ -86,7 +87,7 @@ class VaultListPanel(QFrame):
         col.addLayout(filters)
 
         self.list = QListWidget()
-        self.list.setSpacing(8)
+        self.list.setSpacing(2)
         self.list.currentItemChanged.connect(on_select)
         col.addWidget(self.list, 1)
 
@@ -229,16 +230,16 @@ class EntryDetailPanel(QFrame):
         content_box.setSpacing(12)
         content_box.addWidget(caption("SECRET"))
         self.secret_lbl = QLabel("")
-        self.secret_lbl.setObjectName("h1")
+        self.secret_lbl.setObjectName("secret")
         self.secret_lbl.setTextInteractionFlags(Qt.TextSelectableByMouse)
         content_box.addWidget(self.secret_lbl)
 
         secret_actions = QHBoxLayout()
         self.reveal_btn = QPushButton("  Reveal")
-        self.reveal_btn.setIcon(icon("eye", TEXT))
+        self.reveal_btn.setIcon(icon("eye", P.TEXT_PRIMARY, 16))
         self.reveal_btn.clicked.connect(on_reveal)
         self.copy_btn = QPushButton("  Copy")
-        self.copy_btn.setIcon(icon("copy", TEXT))
+        self.copy_btn.setIcon(icon("copy", P.TEXT_PRIMARY, 16))
         self.copy_btn.clicked.connect(on_copy)
         secret_actions.addWidget(self.reveal_btn)
         secret_actions.addWidget(self.copy_btn)
@@ -258,22 +259,22 @@ class EntryDetailPanel(QFrame):
 
         action_row = QHBoxLayout()
         self.favorite_btn = QPushButton("  Favorite")
-        self.favorite_btn.setIcon(icon("star", ACCENT))
+        self.favorite_btn.setIcon(icon("star", P.ACCENT, 16))
         self.favorite_btn.clicked.connect(on_favorite)
         self.share_btn = QPushButton("  Zero Trust share")
-        self.share_btn.setIcon(icon("users", TEXT))
+        self.share_btn.setIcon(icon("users", P.TEXT_PRIMARY, 16))
         self.share_btn.clicked.connect(on_share)
         action_row.addWidget(self.favorite_btn)
         action_row.addWidget(self.share_btn)
         content_box.addLayout(action_row)
 
         self.restore_btn = QPushButton("  Restore entry")
-        self.restore_btn.setIcon(icon("rotate", TEXT))
+        self.restore_btn.setIcon(icon("rotate", P.TEXT_PRIMARY, 16))
         self.restore_btn.clicked.connect(on_restore)
         content_box.addWidget(self.restore_btn)
 
         self.del_btn = QPushButton("  Delete entry")
-        self.del_btn.setIcon(icon("trash", DANGER))
+        self.del_btn.setIcon(icon("trash", P.DANGER, 16))
         self.del_btn.setObjectName("danger")
         self.del_btn.clicked.connect(on_delete)
         content_box.addWidget(self.del_btn)

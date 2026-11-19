@@ -4,14 +4,15 @@
 
 ![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)
 ![core Rust](https://img.shields.io/badge/core-Rust-CE422B?style=flat-square&logo=rust&logoColor=white)
-![crypto Argon2id + XChaCha20](https://img.shields.io/badge/crypto-Argon2id_+_XChaCha20-6E7681?style=flat-square)
+![crypto Argon2id + AES-GCM / XChaCha20](https://img.shields.io/badge/crypto-Argon2id_+_AES--GCM_%2F_XChaCha20-6E7681?style=flat-square)
 ![recovery Shamir K-of-N](https://img.shields.io/badge/recovery-Shamir_K--of--N-1F2A37?style=flat-square)
+![Windows .exe](https://img.shields.io/badge/Windows-.exe-0078D4?style=flat-square&logo=windows&logoColor=white)
 ![license MIT](https://img.shields.io/badge/license-MIT-2A3340?style=flat-square)
 
 **An encrypted, local-first secrets vault you actually own: one file, no server,
 no cloud.**
 
-![demo](docs/demo.gif)
+![AegisVault: the vault, an entry and its live 2FA code](docs/screenshots/vault.png)
 
 </div>
 
@@ -23,17 +24,32 @@ no cloud.**
 | --- | --- |
 | **What it is** | A `1Password`/`pass`-style secrets manager where the vault is a file on your disk. GUI, CLI and a background agent are three thin adapters over one core. |
 | **The one idea** | The master password never encrypts your data. It derives a key that **wraps** a random data key — envelope encryption, the pattern KMS and Vault use. Rotating the password rewraps that key; not a single secret is re-encrypted. |
-| **Why two languages** | The domain is Python because that is where the rules live. The cryptography is a native Rust module — Argon2id, XChaCha20-Poly1305, `zeroize`. A pure-Python backend (scrypt + AES-GCM) keeps the app whole without a Rust toolchain: same port, different adapter. |
+| **Why two languages** | The domain is Python because that is where the rules live. The cryptography is a native Rust module — Argon2id, XChaCha20-Poly1305, `zeroize`. A pure-Python backend (Argon2id from `cryptography`, AES-256-GCM) keeps the app whole without a Rust toolchain: same port, different adapter. |
 | **Losing the password** | Is survivable. Shamir K-of-N shares over GF(2⁸) reconstruct the key from any K of N, and the shares outlive password rotations. |
 | **Tamper evidence** | Every action is a block in a SHA-256 chain. `verify` does not just say "broken" — it names the block where the chain breaks. |
-| **Size** | ~98 tests · strict hexagonal, domain with zero I/O |
-| **Run it** | `pip install -e .` then `aegisvault --vault vault.fv init` |
+| **Size** | 214 tests · strict hexagonal, domain with zero I/O |
+| **Run it** | `pip install -e ".[gui]"` then `aegisvault-gui` · on Windows, one [`AegisVault.exe`](#windows-exe) |
 
-**Contents** — [Architecture](#architecture) ·
+**Contents** — [Screenshots](#screenshots) · [Architecture](#architecture) ·
 [How a vault is sealed](#how-a-vault-is-sealed) ·
 [Forgetting the master password](#forgetting-the-master-password) ·
 [The audit ledger](#the-audit-ledger) · [What it does](#what-it-does) ·
-[Install](#install-and-run) · [Workflows](#workflows) · [Status](#status)
+[Install](#install-and-run) · [Windows .exe](#windows-exe) · [Workflows](#workflows) ·
+[Status](#status)
+
+---
+
+## Screenshots
+
+| | |
+| --- | --- |
+| ![Unlock](docs/screenshots/unlock.png)<br>**Unlock.** The crypto profile is on show; from the fifth wrong password on, each try waits 30 seconds. | ![Command palette](docs/screenshots/palette.png)<br>**Command palette.** `Ctrl K` finds entries and actions, ignoring case and accents. |
+| ![Sharing](docs/screenshots/share.png)<br>**Sharing.** Sealed to the colleague's X25519 key, once both of you have compared its fingerprint. | ![Shamir recovery](docs/screenshots/shamir.png)<br>**Recovery.** Shamir shares: any K of N open the vault, fewer reveal nothing. |
+| ![Health](docs/screenshots/health.png)<br>**Health.** Breached, reused, weak, old and 2FA-less logins, scored 0–100 and sorted by impact. | ![Audit](docs/screenshots/audit.png)<br>**Audit.** Every block re-hashed and linked to the one before it. |
+| ![Light theme](docs/screenshots/vault-light.png)<br>**Light theme.** Same layout, ink on ivory. | |
+
+`python scripts/capture_screenshots.py` regenerates them offscreen from a throwaway vault
+with made-up entries, so no real secret can end up in a picture.
 
 ---
 
@@ -85,7 +101,11 @@ Two crypto adapters sit behind one port, and the vault records which one made it
 | Backend | KDF | AEAD | When |
 | --- | --- | --- | --- |
 | `ferrocrypto` (Rust, PyO3/maturin) | Argon2id | XChaCha20-Poly1305 + `zeroize` | Built and importable |
-| Pure Python | scrypt | AES-GCM | Fallback, keeps CI green with no toolchain |
+| Pure Python | Argon2id via `cryptography` (scrypt where OpenSSL lacks it) | AES-256-GCM | No toolchain needed; what the Windows `.exe` ships |
+
+Argon2id runs with m = 256 MiB, t = 3, p = 4. Every build opens both Argon2id and scrypt
+vaults; a vault sealed with XChaCha20 needs the Rust core, and a build without it says
+so instead of failing.
 
 ---
 
@@ -97,7 +117,7 @@ The master password is never the key to your data. It is the key to the key.
 flowchart TD
     PW["Master password"] -->|"Argon2id · per-vault salt"| KEK["<b>KEK</b><br/>key-encryption key<br/><i>never stored</i>"]
     RNG["CSPRNG"] --> DEK["<b>DEK</b><br/>random data key"]
-    DEK -->|"AEAD seals the entries"| BODY[("Sealed vault body<br/>vault.fv or vault.db")]
+    DEK -->|"AEAD seals the entries"| BODY[("Sealed vault body<br/>personal.avault or vault.db")]
     KEK -->|wraps| WRAPPED["Wrapped DEK<br/><i>stored in the header</i>"]
     DEK -.-> WRAPPED
 
@@ -114,7 +134,8 @@ whether the vault holds ten secrets or ten thousand — and a crash mid-rotation
 corrupt the body, because the body is not touched.
 
 Storage is a port with two adapters, chosen by the path you give it: an encrypted file
-(`vault.fv`) or SQLite (`vault.db`). Both hold the same sealed artifact.
+(any name; the desktop app suggests `personal.avault`) or SQLite (`.db` / `.sqlite`).
+Both hold the same sealed artifact.
 
 ---
 
@@ -196,12 +217,19 @@ KeePass and generic CSV; encrypted backup, restore and sync bundles.
 into a subprocess, the way `doppler run` does; an ssh-agent-style Unix-socket daemon
 serves `LIST`/`GET`/`CODE` with idle auto-lock.
 
-**Desktop GUI** — PySide6 with an indigo design system and bundled Inter font; sidebar
-across Vault, Categories, Favourites, Shared and Trash; search and real pagination;
-entry detail with reveal, copy and a live 2FA countdown; dialogs for the health
-dashboard, audit history rendered as a linked chain, recovery enrolment and restore,
-rotation, and a command palette; async unlock with a startup profiler
-(`AEGISVAULT_PROFILE_STARTUP=1`).
+**Desktop GUI** — PySide6 with the *Tinta y marfil* (ink and ivory) design in dark and
+light, a Spanish interface, bundled Inter font and a keyboard-only focus ring. A splash
+checks the crypto backend, the vault file and its header before the unlock screen, which
+also creates vaults: a strong master password is required, and you confirm there is no
+reset before the file exists. The typed password leaves the field the moment it is
+submitted, guessing is throttled, and an unlock cancelled mid-derivation locks the
+session it would have opened. Inside: the vault with categories, favourites, shared
+items and trash; entry detail with reveal, copy and a live 2FA countdown; a command
+palette (`Ctrl K`); the health dashboard; the audit history as a verified chain; sharing
+with fingerprint checks; Shamir enrolment and restore; master-password rotation; SIEM,
+sync, policy and access screens. The session locks on idle, screen lock and suspend, and
+empties the clipboard if it holds something the app copied. `AEGISVAULT_THEME=light`
+forces the theme and `AEGISVAULT_PROFILE_STARTUP=1` prints a startup profile.
 
 ---
 
@@ -216,12 +244,37 @@ pip install -e . && pip install PySide6 cryptography
 cd rust && pip install -e . && cd ..
 
 aegisvault --vault vault.fv init        # or vault.db for the SQLite backend
-aegisvault-gui --vault vault.fv
+aegisvault-gui --vault vault.fv         # no --vault: the last vault, or create one
 ```
 
-> A vault is bound to the crypto backend that created it — Rust means
-> Argon2id/XChaCha20, pure Python means scrypt/AES-GCM. Build the Rust core **before**
-> `init` if you want it.
+> A vault records the algorithms that sealed it: the Rust core seals with
+> Argon2id/XChaCha20-Poly1305, pure Python with Argon2id/AES-256-GCM. Any build opens
+> Argon2id and scrypt vaults, but an XChaCha20 vault needs the Rust core, so build it
+> **before** `init` if you want it.
+
+### Windows .exe
+
+`scripts\build-exe.ps1` builds `dist\AegisVault.exe` with PyInstaller: one windowed
+file of about 31 MB, nothing to install, no administrator rights. Each launch unpacks
+Python and Qt into a private temporary folder, removed again on exit, so the window
+takes a second or two to appear. Settings live in `%APPDATA%\aegisvault\settings.json`.
+
+```powershell
+py -m venv .venv
+.venv\Scripts\python -m pip install -e ".[gui,dev]"
+powershell -ExecutionPolicy Bypass -File scripts\build-exe.ps1
+```
+
+- **Check what you run.** The script prints the SHA-256 and writes it to
+  `dist\AegisVault.exe.sha256`; compare it before trusting a copy someone sent you.
+- **Crypto backend.** The build bundles whatever the environment has. Without the Rust
+  core that is the Python backend (Argon2id, AES-256-GCM), which opens every vault
+  except one sealed with XChaCha20 by a Rust build.
+- **Unsigned.** The exe carries no code signature, so a downloaded copy gets a
+  SmartScreen warning on first run.
+- **Kept small on purpose.** No UPX packing (it trips antivirus heuristics); Qt Quick,
+  Qt Network, software OpenGL and the TUIO touch plug-in, which listens on UDP, stay out
+  of the bundle.
 
 ---
 
@@ -264,18 +317,19 @@ aegisvault --vault v.fv backup --out ~/Dropbox/vault.fv
 ## Status
 
 ```bash
-pytest -q      # 94 passed, 4 skipped
+pytest -q      # 214 passed, 3 skipped
 ```
 
 The pure-Python crypto backend keeps the suite green with no Rust toolchain; the
-Rust-specific tests activate on their own once `ferrocrypto` is built. The four skips
+Rust-specific tests activate on their own once `ferrocrypto` is built. The three skips
 are the tests that need it.
 
 Still open:
 
 - **GitHub Actions CI** — pytest against the pure-Python backend, plus a maturin wheel
   build so the Rust path is covered too.
-- **Windows binary via Nuitka**, published as a release artifact.
+- **Signed Windows releases.** The `.exe` build is in place; what is missing is code
+  signing and a release workflow that publishes it with its SHA-256.
 - **Browser-extension autofill through the agent.** The agent already serves
   `LIST` / `GET` / `CODE` over its socket; what is missing is the extension and the
   native-messaging host that bridges it.

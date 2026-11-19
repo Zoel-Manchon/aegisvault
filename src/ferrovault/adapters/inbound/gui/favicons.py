@@ -13,43 +13,15 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPainterPath, QPixmap
+from PySide6.QtCore import QRectF, Qt
+from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPainterPath, QPen, QPixmap
 
 from .favicon_policy import network_favicons_enabled
+from .theme import PALETTE as P
 
 _MEM: dict[tuple[str, int], QPixmap] = {}
 _NEGATIVE_MEM: dict[str, float] = {}
 _NEGATIVE_TTL_SECONDS = 24 * 60 * 60
-
-
-_BRAND_COLORS = {
-    "binance": "#F0B90B",
-    "github": "#24292F",
-    "gitlab": "#FC6D26",
-    "google": "#4285F4",
-    "gmail": "#EA4335",
-    "amazon": "#FF9900",
-    "aws": "#FF9900",
-    "microsoft": "#00A4EF",
-    "azure": "#0078D4",
-    "docker": "#2496ED",
-    "cloudflare": "#F38020",
-    "stripe": "#635BFF",
-    "paypal": "#003087",
-    "discord": "#5865F2",
-    "slack": "#4A154B",
-    "openai": "#10A37F",
-    "vercel": "#111111",
-    "netflix": "#E50914",
-    "spotify": "#1DB954",
-    "facebook": "#1877F2",
-    "instagram": "#E4405F",
-    "x": "#111111",
-    "twitter": "#1DA1F2",
-    "linkedin": "#0A66C2",
-    "proton": "#6D4AFF",
-}
 
 
 def domain_from_url(url: str | None) -> str:
@@ -174,22 +146,24 @@ def _brand_key(domain: str) -> str:
 
 
 def _fallback_pixmap(domain: str, fallback: str, size: int) -> QPixmap:
+    """Neutral lettermark: colour is reserved for state, so every tile looks alike."""
     key = _brand_key(domain.lower()) if domain else (fallback or "SV").lower()
     initials = _initials(key or fallback or "SV")
-    color = _BRAND_COLORS.get(key, _color_from_text(key or fallback or "vault"))
 
     pm = QPixmap(size, size)
     pm.fill(Qt.transparent)
     painter = QPainter(pm)
     painter.setRenderHint(QPainter.Antialiasing)
-    rect = pm.rect().adjusted(1, 1, -1, -1)
+    rect = QRectF(pm.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
     path = QPainterPath()
-    path.addRoundedRect(rect, size * 0.24, size * 0.24)
-    painter.fillPath(path, QColor(color))
-    painter.setPen(QColor("#FFFFFF" if color.lower() not in {"#f0b90b", "#ff9900"} else "#111827"))
+    path.addRoundedRect(rect, size * 0.22, size * 0.22)
+    painter.fillPath(path, QColor(P.SURFACE_3))
+    painter.setPen(QPen(QColor(P.BORDER_DEFAULT), 1))
+    painter.drawPath(path)
+    painter.setPen(QColor(P.TEXT_PRIMARY))
     font = QFont("Inter")
-    font.setBold(True)
-    font.setPixelSize(max(11, int(size * 0.39)))
+    font.setWeight(QFont.DemiBold)
+    font.setPixelSize(max(11, int(size * 0.36)))
     painter.setFont(font)
     painter.drawText(rect, Qt.AlignCenter, initials)
     painter.end()
@@ -220,12 +194,6 @@ def _initials(text: str) -> str:
         token = tokens[0]
         return token[:2].upper() if len(token) < 8 else token[0].upper()
     return (tokens[0][0] + tokens[1][0]).upper()
-
-
-def _color_from_text(text: str) -> str:
-    palette = ["#8B5CF6", "#06B6D4", "#10B981", "#F59E0B", "#EF4444", "#6366F1", "#EC4899"]
-    digest = hashlib.sha1(text.encode("utf-8", "ignore")).digest()[0]
-    return palette[digest % len(palette)]
 
 
 def prefetch_favicon_files(urls, *, limit: int = 80, fetch: bool | None = None) -> dict[str, int]:

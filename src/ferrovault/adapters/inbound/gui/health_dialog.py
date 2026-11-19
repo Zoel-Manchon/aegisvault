@@ -11,9 +11,8 @@ from PySide6.QtWidgets import (QDialog, QFrame, QHBoxLayout, QLabel,
                                QPushButton, QProgressBar, QScrollArea, QVBoxLayout, QWidget)
 
 from .background import WorkerResult, start_health_scan
-from .theme import ACCENT, DANGER, MUTED, TEXT
+from .theme import PALETTE as P
 
-_AMBER = "#f2c14e"
 
 
 class HealthDialog(QDialog):
@@ -38,7 +37,7 @@ class HealthDialog(QDialog):
             QTimer.singleShot(0, self._start_offline_scan)
 
     def _score_color(self, score: int) -> str:
-        return ACCENT if score >= 80 else _AMBER if score >= 50 else DANGER
+        return P.SUCCESS if score >= 80 else P.WARNING if score >= 50 else P.DANGER
 
     def _clear_root(self) -> None:
         while self._root.count():
@@ -130,15 +129,15 @@ class HealthDialog(QDialog):
             col.addWidget(self._ok("✓ No weak, reused, or breached passwords"))
         if report.breached:
             col.addWidget(self._section(
-                "Breached", DANGER,
+                "Breached", P.DANGER,
                 [f"{n} — seen {c:,}× in breaches" for n, c in report.breached]))
         if report.weak:
-            col.addWidget(self._section("Weak", _AMBER, list(report.weak)))
+            col.addWidget(self._section("Weak", P.WARNING, list(report.weak)))
         if report.reused:
             col.addWidget(self._section(
-                "Reused", _AMBER, [" / ".join(g) for g in report.reused]))
+                "Reused", P.WARNING, [" / ".join(g) for g in report.reused]))
         if report.no_totp:
-            col.addWidget(self._section("No 2FA", MUTED, list(report.no_totp)))
+            col.addWidget(self._section("No 2FA", P.TEXT_SECONDARY, list(report.no_totp)))
         col.addStretch()
 
         scroll = QScrollArea()
@@ -156,14 +155,14 @@ class HealthDialog(QDialog):
         v.addWidget(head)
         for it in items:
             lbl = QLabel(it)
-            lbl.setStyleSheet(f"color: {TEXT};")
+            lbl.setStyleSheet(f"color: {P.TEXT_PRIMARY};")
             lbl.setWordWrap(True)
             v.addWidget(lbl)
         return frame
 
     def _ok(self, text):
         lbl = QLabel(text)
-        lbl.setStyleSheet(f"color: {ACCENT}; font-weight: 600;")
+        lbl.setStyleSheet(f"color: {P.SUCCESS}; font-weight: 600;")
         return lbl
 
     def _check_breaches(self):

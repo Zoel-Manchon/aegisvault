@@ -36,6 +36,11 @@ class EntryView:
     expires_at: str = ""
     created_at: str = ""
     updated_at: str = ""
+    notes: str = ""
+    kind: str = "login"
+    password_changed_at: str = ""
+    deleted_at: str = ""
+    history_count: int = 0
 
     @property
     def active_share_count(self) -> int:

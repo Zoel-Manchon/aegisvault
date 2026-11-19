@@ -37,7 +37,10 @@ class VaultAgent:
             except Exception:
                 return "not-found"
         if cmd == "CODE" and arg:
-            r = self._session.current_code(arg)
+            try:
+                r = self._session.current_code(arg)
+            except Exception:
+                return "not-found"
             return r[0] if r else "no-totp"
         if cmd == "LOCK":
             self._locked = True
@@ -48,7 +51,13 @@ class VaultAgent:
         if os.path.exists(self._path):
             os.unlink(self._path)
         srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        srv.bind(self._path)
+        # Create the socket 0600 from the start: binding first and chmod-ing
+        # after leaves a window in which another local user could connect.
+        old_umask = os.umask(0o177)
+        try:
+            srv.bind(self._path)
+        finally:
+            os.umask(old_umask)
         os.chmod(self._path, 0o600)
         srv.listen(1)
         srv.settimeout(self._timeout)

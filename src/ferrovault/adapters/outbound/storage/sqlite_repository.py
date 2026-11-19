@@ -30,8 +30,41 @@ CREATE TABLE IF NOT EXISTS vault (
 
 
 class SqliteVaultRepository:
-    def __init__(self, path: str):
+    def __init__(self, path: str, backup_dir: str | None = None, keep: int = 10):
         self._path = path
+        self._backup_dir = backup_dir
+        self._keep = max(1, int(keep))
+
+    @property
+    def path(self) -> str:
+        return self._path
+
+    def snapshot(self, label: str = "manual") -> str | None:
+        """Consistent copy through SQLite's online backup API."""
+        import os
+        import time
+        from pathlib import Path
+        if not os.path.exists(self._path):
+            return None
+        src = Path(self._path)
+        folder = Path(self._backup_dir) if self._backup_dir else src.parent / f"{src.stem}-copias"
+        folder.mkdir(parents=True, exist_ok=True)
+        safe = "".join(c if c.isalnum() or c in "-_" else "-" for c in label)[:32] or "copia"
+        stamp = time.strftime('%Y%m%d-%H%M%S')
+        dest = folder / f"{src.stem}-{stamp}-{safe}{src.suffix}"
+        n = 1
+        while dest.exists():                      # never back up over an earlier snapshot
+            dest = folder / f"{src.stem}-{stamp}-{safe}-{n}{src.suffix}"
+            n += 1
+        with closing(sqlite3.connect(self._path)) as source, closing(sqlite3.connect(dest)) as target:
+            source.backup(target)
+        for old in sorted(folder.glob(f"{src.stem}-*{src.suffix}"),
+                          key=lambda p: (p.stat().st_mtime_ns, p.name), reverse=True)[self._keep:]:
+            try:
+                old.unlink()
+            except OSError:
+                pass
+        return str(dest)
 
     def _conn(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._path)

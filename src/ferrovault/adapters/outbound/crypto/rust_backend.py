@@ -20,6 +20,8 @@ except ImportError:
 
 
 class RustKeyDerivation:
+    ALGORITHMS = frozenset({"argon2id"})
+
     def derive(self, password: str, params: KdfParams) -> MasterKey:
         p = params.params
         key = ferrocrypto.derive_key(
@@ -29,8 +31,10 @@ class RustKeyDerivation:
 
 
 class RustCipher:
+    NAME = "XChaCha20-Poly1305"
+
     def encrypt(self, key: bytes, plaintext: bytes, aad: bytes) -> tuple:
-        return ferrocrypto.encrypt(key, plaintext, aad)
+        return ferrocrypto.encrypt(bytes(key), plaintext, aad)
 
     def decrypt(self, key: bytes, nonce: bytes, ciphertext: bytes, aad: bytes) -> bytes:
-        return ferrocrypto.decrypt(key, nonce, ciphertext, aad)
+        return ferrocrypto.decrypt(bytes(key), nonce, ciphertext, aad)

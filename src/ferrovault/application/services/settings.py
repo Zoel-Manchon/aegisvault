@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, fields, replace
+from pathlib import Path
 
 from .policy_pack import default_policy_rules
-from pathlib import Path
+
+THEMES = ("dark", "light", "system")
 
 
 @dataclass(frozen=True)
@@ -38,6 +40,23 @@ class VaultSettings:
     policy_rules: tuple[dict, ...] = default_policy_rules()
     recipient_directory: tuple[dict, ...] = ()
     access_requests: tuple[dict, ...] = ()
+    # --- desktop hardening (all on by default) ---
+    reveal_hide_seconds: int = 15            # re-mask a revealed secret; 0 = never
+    exclude_clipboard_history: bool = True   # keep copies out of Win+V history / cloud clipboard
+    lock_on_screen_lock: bool = True         # lock when Windows locks or the PC sleeps
+    lock_on_minimize: bool = False
+    # --- network (off by default: nothing leaves the machine unless asked) ---
+    breach_check_online: bool = False        # HIBP k-anonymity range queries
+    # --- appearance / workspace ---
+    theme: str = "dark"
+    last_vault_path: str = ""
+    old_password_days: int = 365
+    # --- backups ---
+    backup_dir: str = ""                     # empty = "<vault>-copias" next to the vault
+    keep_backups: int = 10
+    backup_before_risky: bool = True         # snapshot before rotate / recover / import / restore
+    trash_retention_days: int = 30           # trashed entries are purged after this; 0 = keep
+    log_secret_access: bool = True           # copies and reveals go into the audit chain
 
     @classmethod
     def from_dict(cls, data: dict | None) -> "VaultSettings":
@@ -48,8 +67,6 @@ class VaultSettings:
         return settings.normalized()
 
     def normalized(self) -> "VaultSettings":
-        clear = max(1, min(int(self.clipboard_clear_seconds), 3600))
-        lock = max(0, min(int(self.auto_lock_seconds), 24 * 3600))
         valid_roles = {"owner", "admin", "auditor", "member", "readonly"}
         role = self.enterprise_role if self.enterprise_role in valid_roles else "readonly"
         trusted = self.trusted_device_ids
@@ -59,9 +76,10 @@ class VaultSettings:
         device_id = (self.local_device_id or "local-device").strip()
         if self.require_trusted_device and not trusted:
             trusted = (device_id,)
-        return VaultSettings(
-            clipboard_clear_seconds=clear,
-            auto_lock_seconds=lock,
+        return replace(
+            self,
+            clipboard_clear_seconds=_clamp(self.clipboard_clear_seconds, 1, 3600, 15),
+            auto_lock_seconds=_clamp(self.auto_lock_seconds, 0, 24 * 3600, 300),
             require_reveal_before_copy=bool(self.require_reveal_before_copy),
             show_health_sidebar=bool(self.show_health_sidebar),
             enterprise_sync_enabled=bool(self.enterprise_sync_enabled),
@@ -76,10 +94,23 @@ class VaultSettings:
             require_trusted_device=bool(self.require_trusted_device),
             require_mfa_for_high_sensitivity=bool(self.require_mfa_for_high_sensitivity),
             default_team_vault=(self.default_team_vault or "Personal").strip(),
-            default_rotation_interval_days=max(1, min(int(self.default_rotation_interval_days), 3650)),
+            default_rotation_interval_days=_clamp(self.default_rotation_interval_days, 1, 3650, 90),
             policy_rules=_normalize_dict_tuple(self.policy_rules),
             recipient_directory=_normalize_dict_tuple(self.recipient_directory),
             access_requests=_normalize_dict_tuple(self.access_requests),
+            reveal_hide_seconds=_clamp(self.reveal_hide_seconds, 0, 600, 15),
+            exclude_clipboard_history=bool(self.exclude_clipboard_history),
+            lock_on_screen_lock=bool(self.lock_on_screen_lock),
+            lock_on_minimize=bool(self.lock_on_minimize),
+            breach_check_online=bool(self.breach_check_online),
+            theme=self.theme if self.theme in THEMES else "dark",
+            last_vault_path=str(self.last_vault_path or "").strip(),
+            old_password_days=_clamp(self.old_password_days, 30, 3650, 365),
+            backup_dir=str(self.backup_dir or "").strip(),
+            keep_backups=_clamp(self.keep_backups, 1, 100, 10),
+            backup_before_risky=bool(self.backup_before_risky),
+            trash_retention_days=_clamp(self.trash_retention_days, 0, 3650, 30),
+            log_secret_access=bool(self.log_secret_access),
         )
 
     def to_dict(self) -> dict:
@@ -106,6 +137,8 @@ class JsonSettingsStore:
         tmp = self.path.with_suffix(self.path.suffix + ".tmp")
         with tmp.open("w", encoding="utf-8") as fh:
             json.dump(settings.to_dict(), fh, indent=2, sort_keys=True)
+            fh.flush()
+            os.fsync(fh.fileno())
         os.replace(tmp, self.path)
 
 
@@ -121,6 +154,14 @@ class MemorySettingsStore:
     def save(self, settings: VaultSettings) -> None:
         self._settings = settings.normalized()
 
+
+
+def _clamp(value, low: int, high: int, default: int) -> int:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(low, min(number, high))
 
 
 def _normalize_dict_tuple(value) -> tuple[dict, ...]:

@@ -10,14 +10,14 @@ from html import escape
 from PySide6.QtCore import QByteArray, Qt
 from PySide6.QtSvgWidgets import QSvgWidget
 
-from .theme import ACCENT, BG, BORDER, DANGER, MUTED, PANEL, TEXT
+from .theme import PALETTE as P
 
 # A hexagon (the architecture) with a 3-block chain inside (the ledger).
 LOGO_SVG = f"""
 <svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg">
   <path d="M48 8 L82 28 L82 68 L48 88 L14 68 L14 28 Z" fill="none"
-        stroke="{ACCENT}" stroke-width="3" stroke-linejoin="round"/>
-  <g stroke="{ACCENT}" stroke-width="2.4" fill="none">
+        stroke="{P.ACCENT}" stroke-width="3" stroke-linejoin="round"/>
+  <g stroke="{P.ACCENT}" stroke-width="2.4" fill="none">
     <line x1="48" y1="38" x2="48" y2="42"/>
     <line x1="48" y1="56" x2="48" y2="60"/>
     <rect x="40" y="24" width="16" height="14" rx="3"/>
@@ -45,8 +45,8 @@ def empty_state_widget(size: int = 120) -> QSvgWidget:
     svg = f"""
     <svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg" opacity="0.35">
       <path d="M48 8 L82 28 L82 68 L48 88 L14 68 L14 28 Z" fill="none"
-            stroke="{MUTED}" stroke-width="2.5" stroke-linejoin="round"/>
-      <g stroke="{MUTED}" stroke-width="2" fill="none">
+            stroke="{P.TEXT_TERTIARY}" stroke-width="2.5" stroke-linejoin="round"/>
+      <g stroke="{P.TEXT_TERTIARY}" stroke-width="2" fill="none">
         <rect x="40" y="34" width="16" height="14" rx="3"/>
         <rect x="40" y="52" width="16" height="14" rx="3"/>
         <line x1="48" y1="48" x2="48" y2="52"/>
@@ -56,7 +56,7 @@ def empty_state_widget(size: int = 120) -> QSvgWidget:
     return _widget(svg, size, size)
 
 
-_COLORS = {"init": "#58a6ff", "add": ACCENT, "remove": DANGER}
+_COLORS = {"init": P.INFO, "add": P.ACCENT, "remove": P.DANGER}
 
 
 def chain_flow_widget(blocks) -> QSvgWidget:
@@ -69,19 +69,19 @@ def chain_flow_widget(blocks) -> QSvgWidget:
 
     for i, b in enumerate(blocks):
         y = PAD + i * (H + GAP)
-        color = _COLORS.get(b.action, MUTED)
+        color = _COLORS.get(b.action, P.TEXT_SECONDARY)
         cx, cy = PAD + 28, y + H / 2
         # connector to the next block
         if i < len(blocks) - 1:
             ly = y + H
             parts.append(
                 f'<line x1="{cx}" y1="{ly}" x2="{cx}" y2="{ly + GAP}" '
-                f'stroke="{BORDER}" stroke-width="2"/>'
-                f'<circle cx="{cx}" cy="{ly + GAP/2}" r="3" fill="{BORDER}"/>')
+                f'stroke="{P.BORDER_DEFAULT}" stroke-width="2"/>'
+                f'<circle cx="{cx}" cy="{ly + GAP/2}" r="3" fill="{P.BORDER_DEFAULT}"/>')
         # block card
         parts.append(
-            f'<rect x="{PAD}" y="{y}" width="{W}" height="{H}" rx="10" '
-            f'fill="{PANEL}" stroke="{BORDER}" stroke-width="1.5"/>')
+            f'<rect x="{PAD}" y="{y}" width="{W}" height="{H}" rx="8" '
+            f'fill="{P.SURFACE_2}" stroke="{P.BORDER_DEFAULT}" stroke-width="1"/>')
         # index disc
         parts.append(
             f'<circle cx="{cx}" cy="{cy}" r="14" fill="none" '
@@ -92,11 +92,11 @@ def chain_flow_widget(blocks) -> QSvgWidget:
         parts.append(
             f'<text x="{PAD+54}" y="{y+24}" fill="{color}" font-size="13" '
             f'font-family="monospace" font-weight="bold">{escape(b.action)}</text>'
-            f'<text x="{PAD+54}" y="{y+42}" fill="{TEXT}" font-size="12" '
+            f'<text x="{PAD+54}" y="{y+42}" fill="{P.TEXT_PRIMARY}" font-size="12" '
             f'font-family="monospace">{escape(b.detail[:34])}</text>')
         # short hash, right aligned
         parts.append(
-            f'<text x="{PAD+W-14}" y="{cy+4}" fill="{MUTED}" font-size="11" '
+            f'<text x="{PAD+W-14}" y="{cy+4}" fill="{P.TEXT_TERTIARY}" font-size="11" '
             f'font-family="monospace" text-anchor="end">{b.hash[:16]}…</text>')
 
     parts.append("</svg>")
